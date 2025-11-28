@@ -1,8 +1,9 @@
+import os
 import time
 
+import numpy as np
 import pybullet as p
 import pybullet_data
-import numpy as np
 from numba import njit
 
 # 시뮬레이션 설정
@@ -111,6 +112,9 @@ for i in range(int(simulation_duration * time_frequency)):
 
     u = u_new
 
+os.makedirs("sim_data", exist_ok=True)
+with open("sim_data/.gitignore", "w") as f:
+    f.write("*")
 np.save("sim_data/log_traj.npy", np.array(log_traj))
 print(f"시뮬레이션 종료: {t:.2f}초")
 p.disconnect()
