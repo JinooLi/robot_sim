@@ -37,6 +37,7 @@ class RobotSim(ABC):
         self.ctrl_dt = 1.0 / control_frequency  # 제어 주기 (초)
         self.joint_number = p.getNumJoints(self.robotId)  # 로봇 조인트 개수
         self.ctrl_joint_number = 7  # 제어할 조인트 개수
+        self.control_type = p.POSITION_CONTROL  # 기본 제어 타입
 
         # 로봇 조인트 물리 한계치 정보 불러오기
         self.joint_angle_max = []
