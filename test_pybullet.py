@@ -266,7 +266,7 @@ class RobotSim(ABC):
             sim_tic = time.perf_counter()
             current_pos = trajectory[i * sample_rate]
 
-            # [핵심] 물리 엔진을 쓰는 게 아니라, 관절 위치를 강제로 덮어씌움 (Reset)
+            # 물리 엔진을 쓰는 게 아니라, 관절 위치를 강제로 덮어씌움 (Reset)
             for j in range(int(num_joints)):
                 p.resetJointState(robotId, j, current_pos[j])
 
