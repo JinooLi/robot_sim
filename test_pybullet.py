@@ -97,9 +97,9 @@ class RobotSim(ABC):
                     self.robotId, j, self.control_type, targetVelocity=u[j]
                 )
             else:
-            p.setJointMotorControl2(
-                self.robotId, j, self.control_type, targetPosition=u[j]
-            )
+                p.setJointMotorControl2(
+                    self.robotId, j, self.control_type, targetPosition=u[j]
+                )
 
     def set_control_type(self, control_type):
         """제어 입력 타입 지정
@@ -150,6 +150,12 @@ class RobotSim(ABC):
         self.robotId = p.loadURDF("franka_panda/panda.urdf", useFixedBase=True)
         # 중력가속도 설정
         p.setGravity(0, 0, self.gravity_const)
+
+        # 만약 토크 제어라면 기본 모터 비활성화
+        if self.control_type == p.TORQUE_CONTROL:
+            for j in range(self.joint_number):
+                p.setJointMotorControl2(self.robotId, j, p.VELOCITY_CONTROL, force=0)
+
         # 시뮬레이션 타임스텝 설정
         p.setTimeStep(self.dt)
         # 시뮬레이션 루프
