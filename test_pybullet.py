@@ -15,6 +15,7 @@ class RobotSim(ABC):
         time_frequency: float,
         control_frequency: float,
         simulation_duration: float,
+        control_type: str = "position",
     ):
         """시뮬레이션 환경 초기화
 
@@ -37,7 +38,7 @@ class RobotSim(ABC):
         self.ctrl_dt = 1.0 / control_frequency  # 제어 주기 (초)
         self.joint_number = p.getNumJoints(self.robotId)  # 로봇 조인트 개수
         self.ctrl_joint_number = 7  # 제어할 조인트 개수
-        self.control_type = p.POSITION_CONTROL  # 기본 제어 타입
+        self.set_control_type(control_type)
 
         # 로봇 조인트 물리 한계치 정보 불러오기
         self.joint_angle_max = []
@@ -101,13 +102,35 @@ class RobotSim(ABC):
                     self.robotId, j, self.control_type, targetPosition=u[j]
                 )
 
-    def set_control_type(self, control_type):
+    def set_control_type(self, control_type: str):
         """제어 입력 타입 지정
 
         Args:
-            control_type: p.POSITION_CONTROL, p.VELOCITY_CONTROL, p.TORQUE_CONTROL 등
+            control_type (str):  "position", "velocity", "torque" 중 하나
         """
-        self.control_type = control_type
+        if control_type is "position":
+            self.control_type = p.POSITION_CONTROL
+        elif control_type is "velocity":
+            self.control_type = p.VELOCITY_CONTROL
+        elif control_type is "torque":
+            self.control_type = p.TORQUE_CONTROL
+        else:
+            raise ValueError(f"{control_type}은 지원하지 않는 제어 타입입니다.")
+
+    def get_control_type(self, control_type) -> str:
+        """제어 타입 변수를 받고 제어 타입 string을 반환한다.
+
+        Returns:
+            str: "position", "velocity", "torque" 중 하나
+        """
+        if control_type == p.POSITION_CONTROL:
+            return "position"
+        elif control_type == p.VELOCITY_CONTROL:
+            return "velocity"
+        elif control_type == p.TORQUE_CONTROL:
+            return "torque"
+        else:
+            raise ValueError(f"{self.control_type}은 지원하지 않는 제어 타입입니다.")
 
     @abstractmethod
     def controller(self, state, t) -> np.ndarray:
@@ -228,6 +251,7 @@ class RobotSim(ABC):
                     self.time_frequency,
                     self.control_frequency,
                     self.simulation_duration,
+                    self.control_type,
                 ]
             ),
         )
@@ -237,6 +261,9 @@ class RobotSim(ABC):
 
         Args:
             fps (int, optional): 재생 속도. Defaults to 60.
+
+        Raises:
+            ValueError: fps는 시뮬레이션 주파수보다 작아야 합니다.
         """
 
         # 저장된 데이터 불러오기
@@ -245,17 +272,17 @@ class RobotSim(ABC):
             return
         trajectory = np.load(f"sim_data/{file_name}.npy")
         env_data = np.load(f"sim_data/{file_name}_env.npy")
-        self.__init__(*env_data.tolist())
+        self.__init__(*env_data.tolist()[:-1])
 
         if fps >= self.time_frequency:
             raise ValueError("fps는 시뮬레이션 주파수보다 작아야 합니다.")
         sample_rate = int(1.0 / (self.dt * fps))
         steps = len(trajectory)
 
-        # 시각화 환경 셋팅
         p.connect(p.GUI)
+        # 시각화 환경 셋팅
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-        p.setGravity(0, 0, -9.81)
+        p.setGravity(0, 0, self.gravity_const)
 
         # GUI 잡동사니(메뉴 등) 숨기기 -> 영상 찍을 때 깔끔함
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
@@ -297,7 +324,7 @@ class RobotSim(ABC):
 
 
 class MyRobotSim(RobotSim):
-    def controller(self, state) -> np.ndarray:
+    def controller(self, state, t) -> np.ndarray:
         """제어입력을 만든다.
 
         Args:
@@ -319,9 +346,9 @@ if __name__ == "__main__":
         time_frequency=1000.0,
         control_frequency=20.0,
         simulation_duration=5.0,
+        control_type="position",
     )
     print(sim.get_robot_info())
-    sim.set_control_type(control_type=p.POSITION_CONTROL)
     sim.simulate()
     sim.save_simulation_data(name="log_traj2")
     print("시뮬레이션 데이터 저장 완료.")

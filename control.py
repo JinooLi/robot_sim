@@ -4,9 +4,20 @@ import numpy as np
 
 
 class MyRobotSim(RobotSim):
-    def __init__(self, gravity, time_frequency, control_frequency, simulation_duration):
+    def __init__(
+        self,
+        gravity,
+        time_frequency,
+        control_frequency,
+        simulation_duration,
+        control_type,
+    ):
         super().__init__(
-            gravity, time_frequency, control_frequency, simulation_duration
+            gravity,
+            time_frequency,
+            control_frequency,
+            simulation_duration,
+            control_type,
         )
         self.pre_pos = np.zeros(self.ctrl_joint_number)
 
@@ -27,14 +38,28 @@ class MyRobotSim(RobotSim):
 
         dp = np.random.uniform(-0.05, 0.05, size=self.ctrl_joint_number)
         pos = self.pre_pos + dp
-        pos = np.clip(
-            pos,
-            self.joint_angle_min[: self.ctrl_joint_number],
-            self.joint_angle_max[: self.ctrl_joint_number],
-        )
+        if self.control_type == p.POSITION_CONTROL:
+            pos = np.clip(
+                pos,
+                self.joint_angle_min[: self.ctrl_joint_number],
+                self.joint_angle_max[: self.ctrl_joint_number],
+            )
+        elif self.control_type == p.VELOCITY_CONTROL:
+            vel = dp * self.control_frequency
+            vel = np.clip(
+                vel,
+                -np.array(self.velocity_limits[: self.ctrl_joint_number]),
+                np.array(self.velocity_limits[: self.ctrl_joint_number]),
+            )
+            pos = vel
+        elif self.control_type == p.TORQUE_CONTROL:
+            pos = np.random.uniform(
+                -np.array(self.torque_limits[: self.ctrl_joint_number]),
+                np.array(self.torque_limits[: self.ctrl_joint_number]),
+            )
         self.pre_pos = pos.copy()
 
-        pos = np.array([1.0, 0.1, -1.0, 0, 0, 0, 0])
+        # pos = np.array([1.0, 0.1, -1.0, 0, 0, 0, 0])
         return pos
 
 
@@ -44,9 +69,9 @@ if __name__ == "__main__":
         time_frequency=1000.0,
         control_frequency=100.0,
         simulation_duration=10.0,
+        control_type="torque",
     )
     print(sim.get_robot_info())
-    sim.set_control_type(control_type=p.TORQUE_CONTROL)
     sim.simulate()
     sim.save_simulation_data(name="log_traj")
     print("시뮬레이션 데이터 저장 완료.")
