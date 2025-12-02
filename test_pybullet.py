@@ -45,8 +45,8 @@ class RobotSim(ABC):
         self.velocity_limits = []
         for j in range(self.joint_number):
             joint_info = p.getJointInfo(self.robotId, j)
-            self.joint_angle_max.append(joint_info[8])
-            self.joint_angle_min.append(joint_info[9])
+            self.joint_angle_min.append(joint_info[8])
+            self.joint_angle_max.append(joint_info[9])
             self.torque_limits.append(joint_info[10])
             self.velocity_limits.append(joint_info[11])
 
