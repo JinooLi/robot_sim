@@ -109,27 +109,29 @@ class RobotSim(ABC):
         self.control_type = control_type
 
     @abstractmethod
-    def controller(self, state) -> np.ndarray:
+    def controller(self, state, t) -> np.ndarray:
         """제어기 함수
 
         Args:
             state: _description_
+            t: current simulation time
 
         Returns:
             np.ndarray[self.ctrl_joint_number]: 제어할 관절의 개수에 해당하는 제어 입력 벡터
         """
         pass
 
-    def control(self, state) -> np.ndarray:
+    def control(self, state, t) -> np.ndarray:
         """제어 입력을 관절 수에 맞게 확장하는 함수
 
         Args:
             state: 현재 state
+            t: current simulation time
 
         Returns:
             np.ndarray: 제어 입력
         """
-        u = self.controller(state)
+        u = self.controller(state, t)
         np_array = np.zeros(self.ctrl_joint_number)
         for i in range(self.ctrl_joint_number):
             np_array[i] = u[i]
@@ -158,7 +160,7 @@ class RobotSim(ABC):
 
             # 제어 입력 계산
             tic = time.perf_counter()
-            u_new: np.ndarray = self.control(state)
+            u_new: np.ndarray = self.control(state, t)
             toc = time.perf_counter()
 
             # 계산 시간에 따른 딜레이 스텝 수 계산
@@ -285,6 +287,7 @@ class RobotSim(ABC):
         print("재생 종료")
         time.sleep(2)
         p.disconnect()
+
 
 class MyRobotSim(RobotSim):
     def controller(self, state) -> np.ndarray:
