@@ -251,7 +251,6 @@ class RobotSim(ABC):
                     self.time_frequency,
                     self.control_frequency,
                     self.simulation_duration,
-                    self.control_type,
                 ]
             ),
         )
@@ -272,7 +271,7 @@ class RobotSim(ABC):
             return
         trajectory = np.load(f"sim_data/{file_name}.npy")
         env_data = np.load(f"sim_data/{file_name}_env.npy")
-        self.__init__(*env_data.tolist()[:-1])
+        self.__init__(*env_data.tolist(), control_type="position")
 
         if fps >= self.time_frequency:
             raise ValueError("fps는 시뮬레이션 주파수보다 작아야 합니다.")
