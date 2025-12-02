@@ -89,6 +89,13 @@ class RobotSim(ABC):
         # 예: 특정 조인트(관절) 위치 제어
         # Panda 로봇의 조인트 인덱스는 URDF 구조에 따라 다름
         for j in range(self.joint_number):
+            if self.control_type == p.TORQUE_CONTROL:
+                p.setJointMotorControl2(self.robotId, j, self.control_type, force=u[j])
+            elif self.control_type == p.VELOCITY_CONTROL:
+                p.setJointMotorControl2(
+                    self.robotId, j, self.control_type, targetVelocity=u[j]
+                )
+            else:
             p.setJointMotorControl2(
                 self.robotId, j, self.control_type, targetPosition=u[j]
             )
