@@ -1,8 +1,6 @@
-from simulation import RobotSim
-import pybullet as p
 import numpy as np
 
-from interface import RobotInfo, Controller, State
+from interface import Controller, State
 
 
 class MyController(Controller):
@@ -56,6 +54,8 @@ class MyController(Controller):
 
 
 if __name__ == "__main__":
+    from simulation import RobotSim
+
     controller = MyController()
 
     sim = RobotSim(
