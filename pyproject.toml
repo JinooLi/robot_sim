@@ -10,6 +10,7 @@ dependencies = [
     "matplotlib>=3.10.7",
     "numba>=0.62.1",
     "numpy>=2.3.5",
+    "pin>=3.8.0",
     "pybullet>=3.2.7",
     "sympy>=1.14.0",
 ]
