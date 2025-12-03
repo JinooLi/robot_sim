@@ -19,6 +19,7 @@ def main():
     print("시뮬레이션 데이터 저장 완료.")
     sim.visualize(file_name=data_name, fps=50)
     print("시뮬레이션 재생 완료.")
+    sim.plot_trajectory(file_name=data_name, joint_indices=[0, 1, 2, 3, 4, 5, 6])
 
 
 if __name__ == "__main__":

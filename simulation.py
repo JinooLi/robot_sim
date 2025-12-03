@@ -346,6 +346,38 @@ class RobotSim:
         time.sleep(2)
         p.disconnect()
 
+    def plot_trajectory(self, file_name, joint_indices: list):
+        """저장된 시뮬레이션 데이터를 불러와서 지정한 조인트들의 궤적을 플로팅한다.
+
+        Args:
+            file_name (str): 저장된 시뮬레이션 데이터 파일 이름
+            joint_indices (list): 플로팅할 조인트 인덱스 리스트
+        """
+
+        # 저장된 데이터 불러오기
+        if not os.path.exists(f"sim_data/{file_name}.npy"):
+            print("시뮬레이션 데이터가 없습니다.")
+            return
+        env_data = np.load(f"sim_data/{file_name}_env.npy")
+        dt = 1.0 / env_data[1]
+        trajectory = np.load(f"sim_data/{file_name}.npy")
+
+        time_array = np.arange(0, len(trajectory)) * dt
+
+        import matplotlib.pyplot as plt
+
+        plt.figure()
+        for joint_idx in joint_indices:
+            joint_positions = trajectory[:, joint_idx]
+            plt.plot(time_array, joint_positions, label=f"Joint {joint_idx}")
+
+        plt.title("Joint Trajectories")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Joint Position (rad)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
 
 if __name__ == "__main__":
 
@@ -381,3 +413,4 @@ if __name__ == "__main__":
     print("시뮬레이션 데이터 저장 완료.")
     sim.visualize(file_name="log_traj2", fps=50)
     print("시뮬레이션 재생 완료.")
+    sim.plot_trajectory(file_name="log_traj2", joint_indices=[0, 1, 2])
