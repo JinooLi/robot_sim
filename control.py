@@ -2,26 +2,14 @@ from test_pybullet import RobotSim
 import pybullet as p
 import numpy as np
 
+from interface import RobotInfo, Controller, State
 
-class MyRobotSim(RobotSim):
-    def __init__(
-        self,
-        gravity,
-        time_frequency,
-        control_frequency,
-        simulation_duration,
-        control_type,
-    ):
-        super().__init__(
-            gravity,
-            time_frequency,
-            control_frequency,
-            simulation_duration,
-            control_type,
-        )
-        self.pre_pos = np.zeros(self.ctrl_joint_number)
 
-    def controller(self, state, t) -> np.ndarray:
+class MyController(Controller):
+    def __init__(self):
+        self.pre_pos = np.zeros(7)
+
+    def control(self, state: State, t) -> np.ndarray:
         """제어입력을 만든다.
 
         Args:
@@ -31,31 +19,35 @@ class MyRobotSim(RobotSim):
         Returns:
             np.ndarray: 제어 입력
         """
-        q = np.array([s[0] for s in state])
-        dq = np.array([s[1] for s in state])
-        joint_indices = list(range(self.ctrl_joint_number))
-        robot_id = self.robotId
 
-        dp = np.random.uniform(-0.05, 0.05, size=self.ctrl_joint_number)
+        dp = np.random.uniform(-0.05, 0.05, size=self.robot_info.ctrl_joint_number)
         pos = self.pre_pos + dp
-        if self.control_type == p.POSITION_CONTROL:
+        if self.robot_info.control_type_str == "position":
             pos = np.clip(
                 pos,
-                self.joint_angle_min[: self.ctrl_joint_number],
-                self.joint_angle_max[: self.ctrl_joint_number],
+                self.robot_info.joint_angle_min[: self.robot_info.ctrl_joint_number],
+                self.robot_info.joint_angle_max[: self.robot_info.ctrl_joint_number],
             )
-        elif self.control_type == p.VELOCITY_CONTROL:
-            vel = dp * self.control_frequency
+        elif self.robot_info.control_type_str == "velocity":
+            vel = dp * self.robot_info.control_frequency
             vel = np.clip(
                 vel,
-                -np.array(self.velocity_limits[: self.ctrl_joint_number]),
-                np.array(self.velocity_limits[: self.ctrl_joint_number]),
+                -np.array(
+                    self.robot_info.velocity_limits[: self.robot_info.ctrl_joint_number]
+                ),
+                np.array(
+                    self.robot_info.velocity_limits[: self.robot_info.ctrl_joint_number]
+                ),
             )
             pos = vel
-        elif self.control_type == p.TORQUE_CONTROL:
+        elif self.robot_info.control_type_str == "torque":
             pos = np.random.uniform(
-                -np.array(self.torque_limits[: self.ctrl_joint_number]),
-                np.array(self.torque_limits[: self.ctrl_joint_number]),
+                -np.array(
+                    self.robot_info.torque_limits[: self.robot_info.ctrl_joint_number]
+                ),
+                np.array(
+                    self.robot_info.torque_limits[: self.robot_info.ctrl_joint_number]
+                ),
             )
         self.pre_pos = pos.copy()
 
@@ -64,12 +56,15 @@ class MyRobotSim(RobotSim):
 
 
 if __name__ == "__main__":
-    sim = MyRobotSim(
+    controller = MyController()
+
+    sim = RobotSim(
+        controller=controller,
         gravity=-9.81,
         time_frequency=1000.0,
         control_frequency=100.0,
         simulation_duration=10.0,
-        control_type="torque",
+        control_type_str="position",
     )
     print(sim.get_robot_info())
     sim.simulate()

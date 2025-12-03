@@ -4,27 +4,32 @@ import time
 import numpy as np
 import pybullet as p
 import pybullet_data
-from numba import njit
-from abc import ABC, abstractmethod
+
+from interface import RobotInfo, Controller, State
 
 
-class RobotSim(ABC):
+class RobotSim:
     def __init__(
         self,
-        gravity: float,
-        time_frequency: float,
-        control_frequency: float,
-        simulation_duration: float,
-        control_type: str = "position",
+        controller: Controller = None,  # type: ignore
+        gravity: float = 0,
+        time_frequency: float = 0,
+        control_frequency: float = 0,
+        simulation_duration: float = 0,
+        control_type_str: str = "position",
     ):
         """시뮬레이션 환경 초기화
 
         Args:
+            controller (Controller, optional): 제어기 객체. Defaults to None.
             gravity (float): 중력가속도 (m/s^2)
             time_frequency (float): 시뮬레이션 주파수 (Hz)
             control_frequency (float): 제어 주파수 (Hz) - 시뮬레이션 주파수보다 반드시 작거나 같아야함.
             simulation_duration (float): 시뮬레이션 시간 (t)
+            control_type_str (str): 제어 타입 문자열 ("position", "velocity", "torque")
         """
+        if controller == None:
+            return
         p.connect(p.DIRECT)
         # 로봇(Frank-Emika Panda) 불러오기
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -38,7 +43,7 @@ class RobotSim(ABC):
         self.ctrl_dt = 1.0 / control_frequency  # 제어 주기 (초)
         self.joint_number = p.getNumJoints(self.robotId)  # 로봇 조인트 개수
         self.ctrl_joint_number = 7  # 제어할 조인트 개수
-        self.set_control_type(control_type)
+        self.set_control_type(control_type_str)
 
         # 로봇 조인트 물리 한계치 정보 불러오기
         self.joint_angle_max = []
@@ -52,26 +57,36 @@ class RobotSim(ABC):
             self.torque_limits.append(joint_info[10])
             self.velocity_limits.append(joint_info[11])
 
+        self.controller = controller
+        robot_info = self.get_robot_info()
+        self.controller.set_robot_info(robot_info)
+
         self.log_traj = []
         p.disconnect()
 
-    def get_robot_info(self) -> tuple:
+    def get_robot_info(self) -> RobotInfo:
         """로봇의 조인트 개수 및 한계치 정보를 반환한다.
 
         Returns:
-            joint_number (int): 로봇 조인트 개수
-            joint_angle_max (list): 조인트 최대 각도 리스트
-            joint_angle_min (list): 조인트 최소 각도 리스트
-            torque_limits (list): 토크 한계 리스트
-            velocity_limits (list): 속도 한계 리스트
+            RobotInfo: 로봇 정보\n
+                joint_number (int): 로봇 조인트 개수\n
+                joint_angle_max (list): 조인트 최대 각도 리스트\n
+                joint_angle_min (list): 조인트 최소 각도 리스트\n
+                torque_limits (list): 토크 한계 리스트\n
+                velocity_limits (list): 속도 한계 리스트\n
+                control_frequency (float): 제어 주파수 (Hz)
         """
-        return (
-            self.joint_number,
-            self.joint_angle_max,
-            self.joint_angle_min,
-            self.torque_limits,
-            self.velocity_limits,
+        info = RobotInfo(
+            joint_number=self.joint_number,
+            ctrl_joint_number=self.ctrl_joint_number,
+            joint_angle_min=np.array(self.joint_angle_min),
+            joint_angle_max=np.array(self.joint_angle_max),
+            velocity_limits=np.array(self.velocity_limits),
+            torque_limits=np.array(self.torque_limits),
+            control_type_str=self.control_type2str(self.control_type),
+            control_frequency=self.control_frequency,
         )
+        return info
 
     def _get_robot_state(self):
         """로봇의 현재 상태를 반환한다.
@@ -90,17 +105,37 @@ class RobotSim(ABC):
         """
         # 예: 특정 조인트(관절) 위치 제어
         # Panda 로봇의 조인트 인덱스는 URDF 구조에 따라 다름
-        for j in range(self.joint_number):
-            if self.control_type == p.TORQUE_CONTROL:
-                p.setJointMotorControl2(self.robotId, j, self.control_type, force=u[j])
-            elif self.control_type == p.VELOCITY_CONTROL:
+        if self.control_type == p.TORQUE_CONTROL:
+            for i in range(self.joint_number):
+                p.setJointMotorControl2(self.robotId, i, self.control_type, force=u[i])
+        elif self.control_type == p.VELOCITY_CONTROL:
+            for i in range(self.joint_number):
                 p.setJointMotorControl2(
-                    self.robotId, j, self.control_type, targetVelocity=u[j]
+                    self.robotId, i, self.control_type, targetVelocity=u[i]
                 )
-            else:
+        else:
+            for i in range(self.joint_number):
                 p.setJointMotorControl2(
-                    self.robotId, j, self.control_type, targetPosition=u[j]
+                    self.robotId, i, self.control_type, targetPosition=u[i]
                 )
+
+    def str2control_type(self, control_type_str: str):
+        """제어 타입 string을 받고 제어 타입 변수를 반환한다.
+
+        Args:
+            control_type_str (str): "position", "velocity", "torque" 중 하나
+
+        Returns:
+            control_type: 제어 타입 변수
+        """
+        if control_type_str == "position":
+            return p.POSITION_CONTROL
+        elif control_type_str == "velocity":
+            return p.VELOCITY_CONTROL
+        elif control_type_str == "torque":
+            return p.TORQUE_CONTROL
+        else:
+            raise ValueError(f"{control_type_str}은 지원하지 않는 제어 타입입니다.")
 
     def set_control_type(self, control_type: str):
         """제어 입력 타입 지정
@@ -108,16 +143,9 @@ class RobotSim(ABC):
         Args:
             control_type (str):  "position", "velocity", "torque" 중 하나
         """
-        if control_type is "position":
-            self.control_type = p.POSITION_CONTROL
-        elif control_type is "velocity":
-            self.control_type = p.VELOCITY_CONTROL
-        elif control_type is "torque":
-            self.control_type = p.TORQUE_CONTROL
-        else:
-            raise ValueError(f"{control_type}은 지원하지 않는 제어 타입입니다.")
+        self.control_type = self.str2control_type(control_type)
 
-    def get_control_type(self, control_type) -> str:
+    def control_type2str(self, control_type) -> str:
         """제어 타입 변수를 받고 제어 타입 string을 반환한다.
 
         Returns:
@@ -132,19 +160,6 @@ class RobotSim(ABC):
         else:
             raise ValueError(f"{self.control_type}은 지원하지 않는 제어 타입입니다.")
 
-    @abstractmethod
-    def controller(self, state, t) -> np.ndarray:
-        """제어기 함수
-
-        Args:
-            state: _description_
-            t: current simulation time
-
-        Returns:
-            np.ndarray[self.ctrl_joint_number]: 제어할 관절의 개수에 해당하는 제어 입력 벡터
-        """
-        pass
-
     def control(self, state, t) -> np.ndarray:
         """제어 입력을 관절 수에 맞게 확장하는 함수
 
@@ -155,7 +170,11 @@ class RobotSim(ABC):
         Returns:
             np.ndarray: 제어 입력
         """
-        u = self.controller(state, t)
+        state_adj = State(
+            positions=np.array([s[0] for s in state]),
+            velocities=np.array([s[1] for s in state]),
+        )
+        u = self.controller.control(state_adj, t)
         np_array = np.zeros(self.ctrl_joint_number)
         for i in range(self.ctrl_joint_number):
             np_array[i] = u[i]
@@ -270,8 +289,14 @@ class RobotSim(ABC):
             print("시뮬레이션 데이터가 없습니다.")
             return
         trajectory = np.load(f"sim_data/{file_name}.npy")
+
         env_data = np.load(f"sim_data/{file_name}_env.npy")
-        self.__init__(*env_data.tolist(), control_type="position")
+        self.gravity_const = env_data[0]
+        self.time_frequency = env_data[1]
+        self.control_frequency = env_data[2]
+        self.simulation_duration = env_data[3]
+        self.dt = 1.0 / self.time_frequency
+        self.ctrl_dt = 1.0 / self.control_frequency
 
         if fps >= self.time_frequency:
             raise ValueError("fps는 시뮬레이션 주파수보다 작아야 합니다.")
@@ -322,8 +347,8 @@ class RobotSim(ABC):
         p.disconnect()
 
 
-class MyRobotSim(RobotSim):
-    def controller(self, state, t) -> np.ndarray:
+class MyController(Controller):
+    def control(self, state: State, t: float) -> np.ndarray:
         """제어입력을 만든다.
 
         Args:
@@ -333,19 +358,21 @@ class MyRobotSim(RobotSim):
             np.ndarray: 제어 입력
         """
         # 간단한 예: 모든 조인트를 0.1 라디안 위치로 이동
-        np_array = np.zeros(self.ctrl_joint_number)
-        for i in range(self.ctrl_joint_number):
+        np_array = np.zeros(self.robot_info.ctrl_joint_number)
+        for i in range(self.robot_info.ctrl_joint_number):
             np_array[i] = 0.1
         return np_array
 
 
 if __name__ == "__main__":
-    sim = MyRobotSim(
+    controller = MyController()
+    sim = RobotSim(
         gravity=-9.81,
         time_frequency=1000.0,
         control_frequency=20.0,
         simulation_duration=5.0,
-        control_type="position",
+        control_type_str="position",
+        controller=controller,
     )
     print(sim.get_robot_info())
     sim.simulate()
