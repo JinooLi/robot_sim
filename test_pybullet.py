@@ -68,7 +68,7 @@ class RobotSim:
         """로봇의 조인트 개수 및 한계치 정보를 반환한다.
 
         Returns:
-            RobotInfo: 로봇 정보\n
+            RobotInfo:\n
                 joint_number (int): 로봇 조인트 개수\n
                 joint_angle_max (list): 조인트 최대 각도 리스트\n
                 joint_angle_min (list): 조인트 최소 각도 리스트\n
