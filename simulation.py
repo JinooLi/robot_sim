@@ -5,7 +5,7 @@ import numpy as np
 import pybullet as p
 import pybullet_data
 
-from interface import RobotInfo, Controller, State
+from interface import Controller, RobotInfo, State
 
 
 class RobotSim:
@@ -347,25 +347,26 @@ class RobotSim:
         p.disconnect()
 
 
-class MyController(Controller):
-    def control(self, state: State, t: float) -> np.ndarray:
-        """제어입력을 만든다.
-
-        Args:
-            state: 현재 state
-
-        Returns:
-            np.ndarray: 제어 입력
-        """
-        # 간단한 예: 모든 조인트를 0.1 라디안 위치로 이동
-        np_array = np.zeros(self.robot_info.ctrl_joint_number)
-        for i in range(self.robot_info.ctrl_joint_number):
-            np_array[i] = 0.1
-        return np_array
-
-
 if __name__ == "__main__":
-    controller = MyController()
+
+    class TestController(Controller):
+        def control(self, state: State, t: float) -> np.ndarray:
+            """제어입력을 만든다.
+
+            Args:
+                state: 현재 state
+                t: 현재 시뮬레이션 시간
+
+            Returns:
+                np.ndarray: 제어 입력
+            """
+            # 간단한 예: 모든 조인트를 0.1 라디안 위치로 이동
+            np_array = np.zeros(self.robot_info.ctrl_joint_number)
+            for i in range(self.robot_info.ctrl_joint_number):
+                np_array[i] = 0.1
+            return np_array
+
+    controller = TestController()
     sim = RobotSim(
         gravity=-9.81,
         time_frequency=1000.0,
