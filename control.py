@@ -1,4 +1,4 @@
-from test_pybullet import RobotSim
+from simulation import RobotSim
 import pybullet as p
 import numpy as np
 
