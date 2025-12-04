@@ -4,6 +4,7 @@ import time
 import numpy as np
 import pybullet as p
 import pybullet_data
+import pinocchio as pin
 
 from interface import Controller, RobotInfo, State
 
@@ -60,6 +61,7 @@ class RobotSim:
         self.controller = controller
         robot_info = self.get_robot_info()
         self.controller.set_robot_info(robot_info)
+        self._make_kinematic_functions()
 
         self.log_traj = []
         p.disconnect()
@@ -160,6 +162,26 @@ class RobotSim:
         else:
             raise ValueError(f"{self.control_type}은 지원하지 않는 제어 타입입니다.")
 
+    def _make_kinematic_functions(self):
+        """역기구학 제어를 위한 동적 모델 함수 생성"""
+        urdf_path = os.path.join(pybullet_data.getDataPath(), "franka_panda/panda.urdf")
+        model = pin.buildModelFromUrdf(urdf_path)
+        data = model.createData()
+
+        extend = lambda arr: np.append(arr, [0.0, 0.0])
+
+        self.M_func = lambda q: np.array(pin.crba(model, data, extend(q)), np.float64)[
+            :-2, :-2
+        ]
+
+        self.C_func = lambda q, v: np.array(
+            pin.computeCoriolisMatrix(model, data, extend(q), extend(v)), np.float64
+        )[:-2, :-2]
+
+        self.g_func = lambda q: np.array(
+            pin.computeGeneralizedGravity(model, data, extend(q)), np.float64
+        )[:-2]
+
     def control(self, state, t) -> np.ndarray:
         """제어 입력을 관절 수에 맞게 확장하는 함수
 
@@ -174,7 +196,7 @@ class RobotSim:
             positions=np.array([s[0] for s in state]),
             velocities=np.array([s[1] for s in state]),
         )
-        u = self.controller.control(state_adj, t)
+        u = self.controller.control(state_adj, t, self.M_func, self.C_func, self.g_func)
         np_array = np.zeros(self.ctrl_joint_number)
         for i in range(self.ctrl_joint_number):
             np_array[i] = u[i]

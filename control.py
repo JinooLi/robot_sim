@@ -7,7 +7,7 @@ class MyController(Controller):
     def __init__(self):
         self.pre_pos = np.zeros(7)
 
-    def control(self, state: State, t) -> np.ndarray:
+    def control(self, state: State, t, M, C, g) -> np.ndarray:
         """제어입력을 만든다.
 
         Args:
@@ -18,6 +18,11 @@ class MyController(Controller):
             np.ndarray: 제어 입력
         """
 
+        return self.random_input_generator() + g(
+            state.positions[: self.robot_info.ctrl_joint_number]
+        )
+
+    def random_input_generator(self):
         dp = np.random.uniform(-0.05, 0.05, size=self.robot_info.ctrl_joint_number)
         pos = self.pre_pos + dp
         if self.robot_info.control_type_str == "position":
@@ -48,9 +53,12 @@ class MyController(Controller):
                 ),
             )
         self.pre_pos = pos.copy()
-
-        # pos = np.array([1.0, 0.1, -1.0, 0, 0, 0, 0])
         return pos
+
+
+# 이거 하려면
+# 1. inverse kinematics 컨트롤러 만들어야 함
+# 1-1. dynamic model 필요. Matrix, Coriolis, Gravity 등등 아 그냥 가져오자.
 
 
 if __name__ == "__main__":
@@ -64,7 +72,7 @@ if __name__ == "__main__":
         time_frequency=1000.0,
         control_frequency=100.0,
         simulation_duration=10.0,
-        control_type_str="position",
+        control_type_str="torque",
     )
     print(sim.get_robot_info())
     sim.simulate()

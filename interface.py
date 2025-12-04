@@ -27,5 +27,5 @@ class Controller(ABC):
         self.robot_info = info
 
     @abstractmethod
-    def control(self, state: State, t: float) -> np.ndarray:
+    def control(self, state: State, t: float, M, C, g) -> np.ndarray:
         pass
