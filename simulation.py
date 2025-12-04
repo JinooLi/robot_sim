@@ -6,10 +6,10 @@ import pybullet as p
 import pybullet_data
 import pinocchio as pin
 
-from interface import Controller, RobotInfo, State
+from interface import Controller, RobotInfo, State, ControlType, Simulator
 
 
-class RobotSim:
+class RobotSim(Simulator):
     def __init__(
         self,
         controller: Controller = None,  # type: ignore
@@ -17,7 +17,6 @@ class RobotSim:
         time_frequency: float = 0,
         control_frequency: float = 0,
         simulation_duration: float = 0,
-        control_type_str: str = "position",
     ):
         """시뮬레이션 환경 초기화
 
@@ -27,7 +26,6 @@ class RobotSim:
             time_frequency (float): 시뮬레이션 주파수 (Hz)
             control_frequency (float): 제어 주파수 (Hz) - 시뮬레이션 주파수보다 반드시 작거나 같아야함.
             simulation_duration (float): 시뮬레이션 시간 (t)
-            control_type_str (str): 제어 타입 문자열 ("position", "velocity", "torque")
         """
         if controller == None:
             return
@@ -44,7 +42,7 @@ class RobotSim:
         self.ctrl_dt = 1.0 / control_frequency  # 제어 주기 (초)
         self.joint_number = p.getNumJoints(self.robotId)  # 로봇 조인트 개수
         self.ctrl_joint_number = 7  # 제어할 조인트 개수
-        self.set_control_type(control_type_str)
+        self.set_control_type(controller.control_type)
 
         # 로봇 조인트 물리 한계치 정보 불러오기
         self.joint_angle_max = []
@@ -60,8 +58,10 @@ class RobotSim:
 
         self.controller = controller
         robot_info = self.get_robot_info()
-        self.controller.set_robot_info(robot_info)
         self._make_kinematic_functions()
+        self.controller.set_robot_info(
+            robot_info, self.M_func, self.C_func, self.g_func
+        )
 
         self.log_traj = []
         p.disconnect()
@@ -85,7 +85,6 @@ class RobotSim:
             joint_angle_max=np.array(self.joint_angle_max),
             velocity_limits=np.array(self.velocity_limits),
             torque_limits=np.array(self.torque_limits),
-            control_type_str=self.control_type2str(self.control_type),
             control_frequency=self.control_frequency,
         )
         return info
@@ -107,60 +106,62 @@ class RobotSim:
         """
         # 예: 특정 조인트(관절) 위치 제어
         # Panda 로봇의 조인트 인덱스는 URDF 구조에 따라 다름
-        if self.control_type == p.TORQUE_CONTROL:
-            for i in range(self.joint_number):
-                p.setJointMotorControl2(self.robotId, i, self.control_type, force=u[i])
-        elif self.control_type == p.VELOCITY_CONTROL:
+        if self.p_control_type == p.TORQUE_CONTROL:
             for i in range(self.joint_number):
                 p.setJointMotorControl2(
-                    self.robotId, i, self.control_type, targetVelocity=u[i]
+                    self.robotId, i, self.p_control_type, force=u[i]
+                )
+        elif self.p_control_type == p.VELOCITY_CONTROL:
+            for i in range(self.joint_number):
+                p.setJointMotorControl2(
+                    self.robotId, i, self.p_control_type, targetVelocity=u[i]
                 )
         else:
             for i in range(self.joint_number):
                 p.setJointMotorControl2(
-                    self.robotId, i, self.control_type, targetPosition=u[i]
+                    self.robotId, i, self.p_control_type, targetPosition=u[i]
                 )
 
-    def str2control_type(self, control_type_str: str):
+    def ctrl_type2pct(self, control_type: ControlType):
         """제어 타입 string을 받고 제어 타입 변수를 반환한다.
 
         Args:
-            control_type_str (str): "position", "velocity", "torque" 중 하나
+            control_type (ControlType): ControlType.POSITION, ControlType.VELOCITY, ControlType.TORQUE 중 하나
 
         Returns:
-            control_type: 제어 타입 변수
+            p.control_type: 제어 타입 변수
         """
-        if control_type_str == "position":
+        if control_type == ControlType.POSITION:
             return p.POSITION_CONTROL
-        elif control_type_str == "velocity":
+        elif control_type == ControlType.VELOCITY:
             return p.VELOCITY_CONTROL
-        elif control_type_str == "torque":
+        elif control_type == ControlType.TORQUE:
             return p.TORQUE_CONTROL
         else:
-            raise ValueError(f"{control_type_str}은 지원하지 않는 제어 타입입니다.")
+            raise ValueError(f"{control_type}은 지원하지 않는 제어 타입입니다.")
 
-    def set_control_type(self, control_type: str):
+    def set_control_type(self, control_type: ControlType):
         """제어 입력 타입 지정
 
         Args:
-            control_type (str):  "position", "velocity", "torque" 중 하나
+            control_type (ControlType):  ControlType.POSITION, ControlType.VELOCITY, ControlType.TORQUE 중 하나
         """
-        self.control_type = self.str2control_type(control_type)
+        self.p_control_type = self.ctrl_type2pct(control_type)
 
-    def control_type2str(self, control_type) -> str:
+    def pct2ctrl_type(self, p_control_type) -> ControlType:
         """제어 타입 변수를 받고 제어 타입 string을 반환한다.
 
         Returns:
             str: "position", "velocity", "torque" 중 하나
         """
-        if control_type == p.POSITION_CONTROL:
-            return "position"
-        elif control_type == p.VELOCITY_CONTROL:
-            return "velocity"
-        elif control_type == p.TORQUE_CONTROL:
-            return "torque"
+        if p_control_type == p.POSITION_CONTROL:
+            return ControlType.POSITION
+        elif p_control_type == p.VELOCITY_CONTROL:
+            return ControlType.VELOCITY
+        elif p_control_type == p.TORQUE_CONTROL:
+            return ControlType.TORQUE
         else:
-            raise ValueError(f"{self.control_type}은 지원하지 않는 제어 타입입니다.")
+            raise ValueError(f"{self.p_control_type}은 지원하지 않는 제어 타입입니다.")
 
     def _make_kinematic_functions(self):
         """역기구학 제어를 위한 동적 모델 함수 생성"""
@@ -196,7 +197,7 @@ class RobotSim:
             positions=np.array([s[0] for s in state]),
             velocities=np.array([s[1] for s in state]),
         )
-        u = self.controller.control(state_adj, t, self.M_func, self.C_func, self.g_func)
+        u = self.controller.control(state_adj, t)
         np_array = np.zeros(self.ctrl_joint_number)
         for i in range(self.ctrl_joint_number):
             np_array[i] = u[i]
@@ -216,7 +217,7 @@ class RobotSim:
         p.setGravity(0, 0, self.gravity_const)
 
         # 만약 토크 제어라면 기본 모터 비활성화
-        if self.control_type == p.TORQUE_CONTROL:
+        if self.p_control_type == p.TORQUE_CONTROL:
             for j in range(self.joint_number):
                 p.setJointMotorControl2(self.robotId, j, p.VELOCITY_CONTROL, force=0)
 
@@ -420,13 +421,13 @@ if __name__ == "__main__":
                 np_array[i] = 0.1
             return np_array
 
-    controller = TestController()
+    controller = TestController(control_type=ControlType.POSITION)
     sim = RobotSim(
         gravity=-9.81,
         time_frequency=1000.0,
         control_frequency=20.0,
         simulation_duration=5.0,
-        control_type_str="position",
+        control_type=ControlType.POSITION,
         controller=controller,
     )
     print(sim.get_robot_info())

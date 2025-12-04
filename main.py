@@ -1,18 +1,9 @@
+from interface import ControlType, Simulator
 from control import MyController
 from simulation import RobotSim
 
 
-def main():
-    controller = MyController()
-    sim = RobotSim(
-        controller=controller,
-        gravity=-9.81,
-        time_frequency=1000.0,
-        control_frequency=100.0,
-        simulation_duration=10.0,
-        control_type_str="torque",
-    )
-    print(sim.get_robot_info())
+def run_sim(sim: Simulator):
     sim.simulate()
     data_name = "log_traj"
     sim.save_simulation_data(name=data_name)
@@ -23,4 +14,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    controller = MyController(ControlType.TORQUE)
+    sim = RobotSim(
+        controller=controller,
+        gravity=-9.81,
+        time_frequency=1000.0,
+        control_frequency=100.0,
+        simulation_duration=10.0,
+    )
+    run_sim(sim)

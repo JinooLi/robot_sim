@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 
 import numpy as np
 
@@ -12,7 +13,6 @@ class RobotInfo:
     joint_angle_max: np.ndarray
     velocity_limits: np.ndarray
     torque_limits: np.ndarray
-    control_type_str: str
     control_frequency: float
 
 
@@ -22,10 +22,47 @@ class State:
     velocities: np.ndarray
 
 
+class ControlType(Enum):
+    POSITION = "position"
+    VELOCITY = "velocity"
+    TORQUE = "torque"
+
+
 class Controller(ABC):
-    def set_robot_info(self, info: RobotInfo):
+    def __init__(self, control_type: ControlType):
+        self.control_type = control_type
+
+    def set_robot_info(self, info: RobotInfo, M, C, g):
         self.robot_info = info
+        self.M = M
+        self.C = C
+        self.g = g
 
     @abstractmethod
-    def control(self, state: State, t: float, M, C, g) -> np.ndarray:
+    def control(self, state: State, t: float) -> np.ndarray:
+        pass
+
+
+class Simulator(ABC):
+    @abstractmethod
+    def __init__(
+        self,
+        controller: Controller,
+        gravity: float,
+        time_frequency: float,
+        control_frequency: float,
+        simulation_duration: float,
+    ) -> None:
+        super().__init__()
+
+    @abstractmethod
+    def simulate():
+        pass
+
+    @abstractmethod
+    def visualize(file_name: str, fps: int):
+        pass
+
+    @abstractmethod
+    def plot_trajectory(file_name: str, joint_indices: list[float]):
         pass
