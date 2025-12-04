@@ -20,6 +20,8 @@ class RobotInfo:
 class State:
     positions: np.ndarray
     velocities: np.ndarray
+    ee_position: np.ndarray
+    ee_orientation: np.ndarray
 
 
 class ControlType(Enum):

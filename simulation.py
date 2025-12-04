@@ -89,13 +89,19 @@ class RobotSim(Simulator):
         )
         return info
 
-    def _get_robot_state(self):
+    def _get_robot_state(self) -> State:
         """로봇의 현재 상태를 반환한다.
 
         Returns:
             state: 현재 로봇 상태
         """
-        state = p.getJointStates(self.robotId, range(self.joint_number))
+        p_state = p.getJointStates(self.robotId, range(self.joint_number))
+        state = State(
+            positions=np.array([s[0] for s in p_state]),
+            velocities=np.array([s[1] for s in p_state]),
+            ee_position=np.array(p.getLinkState(self.robotId, 11)[0]),
+            ee_orientation=np.array(p.getLinkState(self.robotId, 11)[1]),
+        )
         return state
 
     def _put_input_to_sim(self, u: np.ndarray):
@@ -183,7 +189,7 @@ class RobotSim(Simulator):
             pin.computeGeneralizedGravity(model, data, extend(q)), np.float64
         )[:-2]
 
-    def control(self, state, t) -> np.ndarray:
+    def control(self, state: State, t) -> np.ndarray:
         """제어 입력을 관절 수에 맞게 확장하는 함수
 
         Args:
@@ -193,11 +199,7 @@ class RobotSim(Simulator):
         Returns:
             np.ndarray: 제어 입력
         """
-        state_adj = State(
-            positions=np.array([s[0] for s in state]),
-            velocities=np.array([s[1] for s in state]),
-        )
-        u = self.controller.control(state_adj, t)
+        u = self.controller.control(state, t)
         np_array = np.zeros(self.ctrl_joint_number)
         for i in range(self.ctrl_joint_number):
             np_array[i] = u[i]
