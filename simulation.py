@@ -60,7 +60,7 @@ class RobotSim(Simulator):
         robot_info = self.get_robot_info()
         self._make_kinematic_functions()
         self.controller.set_robot_info(
-            robot_info, self.M_func, self.C_func, self.g_func
+            robot_info, self.M_func, self.C_func, self.g_func, self.J_linear
         )
 
         self.log_traj = []
@@ -189,6 +189,26 @@ class RobotSim(Simulator):
             pin.computeGeneralizedGravity(model, data, extend(q)), np.float64
         )[:-2]
 
+        self.J_linear = lambda q: self.get_J_linear(extend(q))
+
+    def get_J_linear(self, q) -> np.ndarray:
+        q_list = [float(val) for val in q]
+        dq_list = [0.0] * len(q_list)
+        ddq_list = [0.0] * len(q_list)
+
+        J_linear, _ = p.calculateJacobian(
+            self.robotId,
+            11,
+            [0.0, 0.0, 0.0],
+            q_list,
+            dq_list,
+            ddq_list,
+        )
+
+        J_linear = np.array(J_linear)
+        J_linear = J_linear[:, : self.ctrl_joint_number]
+        return J_linear
+
     def control(self, state: State, t) -> np.ndarray:
         """제어 입력을 관절 수에 맞게 확장하는 함수
 
@@ -206,6 +226,28 @@ class RobotSim(Simulator):
         for i in range(self.joint_number - self.ctrl_joint_number):
             np_array = np.append(np_array, 0.0)
         return np_array
+
+    def draw_debug_point(self, position, color=[1, 0, 0], size=1, lifeTime=0):
+        """
+        position: [x, y, z] 좌표
+        color: [r, g, b] (0~1 사이 값)
+        size: 십자가 크기
+        lifeTime: 유지 시간 (0이면 영구 유지, 양수면 초 단위 후 사라짐)
+        """
+        x, y, z = position
+
+        # X축 선
+        p.addUserDebugLine(
+            [x - size, y, z], [x + size, y, z], lineColorRGB=color, lifeTime=lifeTime
+        )
+        # Y축 선
+        p.addUserDebugLine(
+            [x, y - size, z], [x, y + size, z], lineColorRGB=color, lifeTime=lifeTime
+        )
+        # Z축 선
+        p.addUserDebugLine(
+            [x, y, z - size], [x, y, z + size], lineColorRGB=color, lifeTime=lifeTime
+        )
 
     def simulate(self):
         """제어 입력을 계산하는 시간까지 고려하여 시뮬레이션을 돌리는 함수"""
@@ -339,6 +381,7 @@ class RobotSim(Simulator):
         p.loadURDF("plane.urdf")
         robotId = p.loadURDF("franka_panda/panda.urdf", useFixedBase=True)
         num_joints = p.getNumJoints(robotId)
+        self.draw_debug_point(self.controller.ee_target_pos)
 
         # 재생 루프
         print("재생 시작...")
@@ -429,7 +472,6 @@ if __name__ == "__main__":
         time_frequency=1000.0,
         control_frequency=20.0,
         simulation_duration=5.0,
-        control_type=ControlType.POSITION,
         controller=controller,
     )
     print(sim.get_robot_info())

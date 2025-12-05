@@ -1,6 +1,8 @@
-from interface import ControlType, Simulator
+from interface import Simulator
 from control import MyController
 from simulation import RobotSim
+
+import numpy as np
 
 
 def run_sim(sim: Simulator):
@@ -14,12 +16,12 @@ def run_sim(sim: Simulator):
 
 
 if __name__ == "__main__":
-    controller = MyController(ControlType.TORQUE)
+    controller = MyController(target_ee_pos=np.array([-0.6, -0.6, 0.1]))
     sim = RobotSim(
         controller=controller,
         gravity=-9.81,
         time_frequency=1000.0,
         control_frequency=100.0,
-        simulation_duration=10.0,
+        simulation_duration=20.0,
     )
     run_sim(sim)

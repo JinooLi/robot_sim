@@ -18,6 +18,16 @@ class RobotInfo:
 
 @dataclass
 class State:
+    """로봇의 상태를 나타낸다.
+
+    attrs:
+        positions (np.ndarray): 관절 각도
+        velocities (np.ndarray): 관절 속도
+        ee_position (np.ndarray): 말단 위치
+        ee_orientation (np.ndarray): 말단 자세
+
+    """
+
     positions: np.ndarray
     velocities: np.ndarray
     ee_position: np.ndarray
@@ -25,24 +35,34 @@ class State:
 
 
 class ControlType(Enum):
+    """제어 타입을 나타낸다.
+
+    Args:
+        POSITION: 위치 제어
+        VELOCITY: 속도 제어
+        TORQUE: 토크 제어
+    """
+
     POSITION = "position"
     VELOCITY = "velocity"
     TORQUE = "torque"
 
 
 class Controller(ABC):
-    def __init__(self, control_type: ControlType):
-        self.control_type = control_type
 
-    def set_robot_info(self, info: RobotInfo, M, C, g):
+    def set_robot_info(self, info: RobotInfo, M, C, g, J_linear):
         self.robot_info = info
         self.M = M
         self.C = C
         self.g = g
+        self.J_linear = J_linear
 
     @abstractmethod
     def control(self, state: State, t: float) -> np.ndarray:
         pass
+
+    def set_control_type(self, control_type: ControlType):
+        self.control_type = control_type
 
 
 class Simulator(ABC):
