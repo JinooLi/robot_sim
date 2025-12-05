@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from typing import Callable
 
 import numpy as np
 
@@ -91,4 +92,12 @@ class Simulator(ABC):
 
     @abstractmethod
     def save_simulation_data(self, name: str):
+        pass
+
+
+class CLBFGenerator(ABC):
+    @abstractmethod
+    def get_lambda_W_and_gradW(
+        self,
+    ) -> tuple[Callable[[np.ndarray], float], Callable[[np.ndarray], np.ndarray]]:
         pass

@@ -64,6 +64,8 @@ class RobotSim(Simulator):
         )
 
         self.log_traj = []
+        self.W_record = []
+        self.dW_record = []
         p.disconnect()
 
     def get_robot_info(self) -> RobotInfo:
@@ -249,6 +251,24 @@ class RobotSim(Simulator):
             [x, y, z - size], [x, y, z + size], lineColorRGB=color, lifeTime=lifeTime
         )
 
+    def draw_debug_sphere(self, position, radius=0.05, color=[1, 0, 0], lifeTime=0):
+        """
+        position: [x, y, z] 좌표
+        radius: 구의 반지름
+        color: [r, g, b] (0~1 사이 값)
+        lifeTime: 유지 시간 (0이면 영구 유지, 양수면 초 단위 후 사라짐)
+        """
+        visual_shape_id = p.createVisualShape(
+            shapeType=p.GEOM_SPHERE,
+            radius=radius,
+            rgbaColor=[color[0], color[1], color[2], 1],
+        )
+        p.createMultiBody(
+            baseMass=0,
+            baseVisualShapeIndex=visual_shape_id,
+            basePosition=position,
+        )
+
     def simulate(self):
         """제어 입력을 계산하는 시간까지 고려하여 시뮬레이션을 돌리는 함수"""
         # 시뮬레이션 엔진 연결 (DIRECT 모드)
@@ -296,6 +316,8 @@ class RobotSim(Simulator):
                     )
                 ]
                 self.log_traj.append(current_pos)
+                self.W_record.append(self.controller.W_func(state.ee_position))
+                self.dW_record.append(self.controller.dW_dx_func(state.ee_position))
                 t += self.dt
 
             # 남은 제어 주기 동안 새로운 제어 입력으로 시뮬레이션 진행
@@ -311,6 +333,8 @@ class RobotSim(Simulator):
                     )
                 ]
                 self.log_traj.append(current_pos)
+                self.W_record.append(self.controller.W_func(state.ee_position))
+                self.dW_record.append(self.controller.dW_dx_func(state.ee_position))
                 t += self.dt
 
             u = u_new
@@ -329,6 +353,8 @@ class RobotSim(Simulator):
             with open("sim_data/.gitignore", "w") as f:
                 f.write("*")
         np.save(f"sim_data/{name}.npy", np.array(self.log_traj))
+        np.save(f"sim_data/{name}_W.npy", np.array(self.W_record))
+        np.save(f"sim_data/{name}_dW.npy", np.array(self.dW_record))
         np.save(
             f"sim_data/{name}_env.npy",
             np.array(
@@ -382,6 +408,10 @@ class RobotSim(Simulator):
         robotId = p.loadURDF("franka_panda/panda.urdf", useFixedBase=True)
         num_joints = p.getNumJoints(robotId)
         self.draw_debug_point(self.controller.ee_target_pos)
+        self.draw_debug_sphere(
+            self.controller.clbf_generator.unsafe_region_center,
+            radius=self.controller.clbf_generator.unsafe_region_radius,
+        )
 
         # 재생 루프
         print("재생 시작...")
@@ -429,6 +459,8 @@ class RobotSim(Simulator):
         env_data = np.load(f"sim_data/{file_name}_env.npy")
         dt = 1.0 / env_data[1]
         trajectory = np.load(f"sim_data/{file_name}.npy")
+        W_values = np.load(f"sim_data/{file_name}_W.npy")
+        dW_values = np.load(f"sim_data/{file_name}_dW.npy")
 
         time_array = np.arange(0, len(trajectory)) * dt
 
@@ -438,10 +470,19 @@ class RobotSim(Simulator):
         for joint_idx in joint_indices:
             joint_positions = trajectory[:, joint_idx]
             plt.plot(time_array, joint_positions, label=f"Joint {joint_idx}")
-
         plt.title("Joint Trajectories")
         plt.xlabel("Time (s)")
         plt.ylabel("Joint Position (rad)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        plt.figure()
+        plt.plot(time_array, W_values, label="W")
+        plt.plot(time_array, dW_values, label="dW")
+        plt.title("W and dW over Time")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Value")
         plt.legend()
         plt.grid()
         plt.show()

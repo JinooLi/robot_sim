@@ -1,5 +1,5 @@
 from interface import Simulator
-from control import MyController
+from control import MyController, MyCLBFGenerator
 from simulation import RobotSim
 
 import numpy as np
@@ -16,7 +16,17 @@ def run_sim(sim: Simulator):
 
 
 if __name__ == "__main__":
-    controller = MyController(target_ee_pos=np.array([-0.6, -0.6, 0.1]))
+
+    clbf_gen = MyCLBFGenerator(
+        unsafe_region_center=np.array([0.3, 0.3, 0.6]),
+        unsafe_region_radius=0.15,
+        barrier_gain=200,
+        Lyapunov_center=np.array([0.5, 0.5, 0.5]),
+    )
+
+    controller = MyController(
+        clbf_generator=clbf_gen, target_ee_pos=np.array([-0.6, -0.6, 0.1])
+    )
     sim = RobotSim(
         controller=controller,
         gravity=-9.81,

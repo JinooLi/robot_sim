@@ -1,13 +1,74 @@
 import numpy as np
+from typing import Callable
+from interface import Controller, State, ControlType, CLBFGenerator
 
-from interface import Controller, State, ControlType
+
+class MyCLBFGenerator(CLBFGenerator):
+    def __init__(
+        self,
+        unsafe_region_center: np.ndarray,
+        unsafe_region_radius: float,
+        barrier_gain: float,
+        Lyapunov_center: np.ndarray,
+    ):
+        self.unsafe_region_center = unsafe_region_center
+        self.unsafe_region_radius = unsafe_region_radius
+        self.barrier_gain = barrier_gain
+        self.Lyapunov_center = Lyapunov_center
+
+    def get_lambda_W_and_gradW(
+        self,
+    ) -> tuple[Callable[[np.ndarray], float], Callable[[np.ndarray], np.ndarray]]:
+        W_func = lambda x: self._W(x, self.barrier_gain)
+        dW_dx_func = lambda x: self._dW_dx(x, self.barrier_gain)
+        return W_func, dW_dx_func
+
+    def _sigmoid(self, s):
+        return 1 / (1 + np.exp(-s))
+
+    def _dsigmoid(self, s):
+        sig = self._sigmoid(s)
+        return sig * (1 - sig)
+
+    def _Circ(self, x: np.ndarray, theta: float = 10.0):
+        return -theta * (
+            (x - self.unsafe_region_center) @ (x - self.unsafe_region_center)
+            - self.unsafe_region_radius**2
+        )
+
+    def _dCirc_dx(self, x: np.ndarray, theta: float = 10.0):
+        return -2 * theta * (x - self.unsafe_region_center)
+
+    def _barrier_function(self, x: np.ndarray, theta: float = 10.0):
+        return self._sigmoid(self._Circ(x, theta))
+
+    def _dB_dx(self, x: np.ndarray, theta: float = 10.0):
+        return self._dsigmoid(self._Circ(x, theta)) * self._dCirc_dx(x, theta)
+
+    def _V(self, x: np.ndarray):
+        return 0.5 * (x - self.Lyapunov_center) @ (x - self.Lyapunov_center)
+
+    def _dV_dx(self, x: np.ndarray):
+        return x - self.Lyapunov_center
+
+    def _W(self, x: np.ndarray, theta: float = 10.0):
+        return self._V(x) + self._barrier_function(x, theta)
+
+    def _dW_dx(self, x: np.ndarray, theta: float = 10.0):
+        return self._dV_dx(x) + self._dB_dx(x, theta)
 
 
 class MyController(Controller):
-    def __init__(self, target_ee_pos: np.ndarray = np.array([-0.3, -0.3, 0.8])):
+    def __init__(
+        self,
+        clbf_generator: MyCLBFGenerator,
+        target_ee_pos: np.ndarray = np.array([-0.3, -0.3, 0.8]),
+    ):
         super().__init__()
+        self.clbf_generator = clbf_generator
+        self.W_func, self.dW_dx_func = clbf_generator.get_lambda_W_and_gradW()
         self.pre_pos = np.zeros(7)
-        self.ee_target_pos = target_ee_pos
+        self.ee_target_pos = clbf_generator.Lyapunov_center
         self.pre_torques = np.zeros(7)
         self.set_control_type(ControlType.VELOCITY)
 
@@ -70,7 +131,7 @@ class MyController(Controller):
 
         k_ee = 1
 
-        end_effector_control = J_pinv @ (target_pose - state.ee_position) * k_ee
+        end_effector_control = J_pinv @ (-self.dW_dx_func(state.ee_position)) * k_ee
 
         k_N = 1
 
@@ -95,7 +156,16 @@ class MyController(Controller):
 if __name__ == "__main__":
     from simulation import RobotSim
 
-    controller = MyController(target_ee_pos=np.array([-0.6, -0.6, 0.1]))
+    clbf_Gen = MyCLBFGenerator(
+        unsafe_region_center=np.array([0.0, 0.0, 0.6]),
+        unsafe_region_radius=0.3,
+        barrier_gain=100.0,
+        Lyapunov_center=np.array([0.5, 0.5, 0.5]),
+    )
+
+    controller = MyController(
+        clbf_generator=clbf_Gen, target_ee_pos=np.array([-0.6, -0.6, 0.1])
+    )
 
     sim = RobotSim(
         controller=controller,
