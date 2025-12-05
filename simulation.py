@@ -466,7 +466,7 @@ if __name__ == "__main__":
                 np_array[i] = 0.1
             return np_array
 
-    controller = TestController(control_type=ControlType.POSITION)
+    controller = TestController()
     sim = RobotSim(
         gravity=-9.81,
         time_frequency=1000.0,

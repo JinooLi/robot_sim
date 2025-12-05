@@ -78,13 +78,17 @@ class Simulator(ABC):
         super().__init__()
 
     @abstractmethod
-    def simulate():
+    def simulate(self):
         pass
 
     @abstractmethod
-    def visualize(file_name: str, fps: int):
+    def visualize(self, file_name: str, fps: int):
         pass
 
     @abstractmethod
-    def plot_trajectory(file_name: str, joint_indices: list[float]):
+    def plot_trajectory(self, file_name: str, joint_indices: list[float]):
+        pass
+
+    @abstractmethod
+    def save_simulation_data(self, name: str):
         pass

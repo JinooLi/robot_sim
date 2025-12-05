@@ -74,14 +74,14 @@ class MyController(Controller):
 
         k_N = 1
 
-        null_space_control = N @ (-k_N * state.velocities[:cjn])
+        null_space_control = N @ (-k_N * state.positions[:cjn])
 
         dq = end_effector_control + null_space_control
 
         dq = np.clip(
             dq,
-            -0.5 * np.ones(cjn),
-            0.5 * np.ones(cjn),
+            -0.5 * self.robot_info.velocity_limits[:cjn],
+            0.5 * self.robot_info.velocity_limits[:cjn],
         )
 
         return dq
