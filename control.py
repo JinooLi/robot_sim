@@ -123,34 +123,38 @@ class MyController(Controller):
     def velocity_control(self, state: State, t) -> np.ndarray:
         cjn = self.robot_info.ctrl_joint_number
 
-        J = self.J_linear(state.positions[:cjn])
-
-        J_pinv = J.T @ np.linalg.inv(J @ J.T)
-
-        N = np.eye(cjn) - J_pinv @ J
+        J = self.J_linear(state.positions[:cjn], 11)  # end-effector의 Jacobian
 
         k_ee = 1
 
+        # J_pinv = J.T @ np.linalg.inv(J @ J.T)
+        J_pinv = np.linalg.pinv(J)
         end_effector_control = J_pinv @ (-self.dW_dx_func(state.ee_position)) * k_ee
 
-        k_N = 1
+        N = np.eye(cjn) - J_pinv @ J
 
-        null_space_control = N @ (-k_N * state.positions[:cjn])
+        k_N = 0.73
+
+        p_null = np.zeros(cjn)
+        for i in range(cjn):
+            J_link = self.J_linear(state.positions[:cjn], i)
+            pos = self.get_pos_of_joint(i)
+            J_pinv_link = J_link.T @ np.linalg.inv(
+                J_link @ J_link.T + 1e-6 * np.eye(3)
+            )  # np.linalg.pinv(J_link) <- 이거 쓰면 기존 행렬이 거의 singular일 때 터진다.
+            p_null += J_pinv_link @ self.dW_dx_func(pos)
+
+        null_space_control = -N @ p_null * k_N  # (k_N * state.velocities[:cjn])
 
         dq = end_effector_control + null_space_control
 
         dq = np.clip(
             dq,
-            -0.5 * self.robot_info.velocity_limits[:cjn],
-            0.5 * self.robot_info.velocity_limits[:cjn],
+            -0.2 * self.robot_info.velocity_limits[:cjn],
+            0.2 * self.robot_info.velocity_limits[:cjn],
         )
 
         return dq
-
-
-# 이거 하려면
-# 1. inverse kinematics 컨트롤러 만들어야 함
-# 1-1. dynamic model 필요. Matrix, Coriolis, Gravity 등등 아 그냥 가져오자.
 
 
 if __name__ == "__main__":

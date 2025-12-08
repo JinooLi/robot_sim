@@ -18,7 +18,7 @@ def run_sim(sim: Simulator):
 if __name__ == "__main__":
 
     clbf_gen = MyCLBFGenerator(
-        unsafe_region_center=np.array([0.3, 0.3, 0.6]),
+        unsafe_region_center=np.array([0.3, 0.3, 0.8]),
         unsafe_region_radius=0.15,
         barrier_gain=200,
         Lyapunov_center=np.array([0.5, 0.5, 0.5]),
@@ -32,6 +32,6 @@ if __name__ == "__main__":
         gravity=-9.81,
         time_frequency=1000.0,
         control_frequency=100.0,
-        simulation_duration=20.0,
+        simulation_duration=30.0,
     )
     run_sim(sim)

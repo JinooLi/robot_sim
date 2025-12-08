@@ -60,8 +60,16 @@ class RobotSim(Simulator):
         robot_info = self.get_robot_info()
         self._make_kinematic_functions()
         self.controller.set_robot_info(
-            robot_info, self.M_func, self.C_func, self.g_func, self.J_linear
+            robot_info,
+            self.M_func,
+            self.C_func,
+            self.g_func,
+            self.J_linear,
+            self.get_pos_of_joint,
         )
+
+        # print(np.shape(self.get_J_of_joints(np.zeros(9), 2)))
+        # exit()
 
         self.log_traj = []
         self.W_record = []
@@ -105,6 +113,19 @@ class RobotSim(Simulator):
             ee_orientation=np.array(p.getLinkState(self.robotId, 11)[1]),
         )
         return state
+
+    def get_robot_link_pos(self, link_index: int) -> np.ndarray:
+        """로봇의 특정 링크 위치를 반환한다.
+
+        Args:
+            link_index (int): 링크 인덱스
+
+        Returns:
+            np.ndarray: 링크 위치
+        """
+        link_state = p.getLinkState(self.robotId, link_index)
+        link_pos = np.array(link_state[0])
+        return link_pos
 
     def _put_input_to_sim(self, u: np.ndarray):
         """로봇을 원하는 제어 입력과 control type에 맞게 제어한다.
@@ -191,25 +212,27 @@ class RobotSim(Simulator):
             pin.computeGeneralizedGravity(model, data, extend(q)), np.float64
         )[:-2]
 
-        self.J_linear = lambda q: self.get_J_linear(extend(q))
+        self.J_linear = lambda q, index: self.get_J_of_joints(extend(q), index)
 
-    def get_J_linear(self, q) -> np.ndarray:
+        self.get_pos_of_joint = lambda joint_index: self.get_robot_link_pos(joint_index)
+
+    def get_J_of_joints(self, q, joint_index) -> np.ndarray:
         q_list = [float(val) for val in q]
         dq_list = [0.0] * len(q_list)
         ddq_list = [0.0] * len(q_list)
 
-        J_linear, _ = p.calculateJacobian(
+        J, _ = p.calculateJacobian(
             self.robotId,
-            11,
+            joint_index,
             [0.0, 0.0, 0.0],
             q_list,
             dq_list,
             ddq_list,
         )
 
-        J_linear = np.array(J_linear)
-        J_linear = J_linear[:, : self.ctrl_joint_number]
-        return J_linear
+        J = np.array(J)
+        J = J[:, : self.ctrl_joint_number]
+        return J
 
     def control(self, state: State, t) -> np.ndarray:
         """제어 입력을 관절 수에 맞게 확장하는 함수

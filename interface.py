@@ -51,12 +51,13 @@ class ControlType(Enum):
 
 class Controller(ABC):
 
-    def set_robot_info(self, info: RobotInfo, M, C, g, J_linear):
+    def set_robot_info(self, info: RobotInfo, M, C, g, J_linear, get_pos_of_joint):
         self.robot_info = info
         self.M = M
         self.C = C
         self.g = g
         self.J_linear = J_linear
+        self.get_pos_of_joint = get_pos_of_joint
 
     @abstractmethod
     def control(self, state: State, t: float) -> np.ndarray:
