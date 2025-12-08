@@ -83,7 +83,7 @@ class MyController(Controller):
             np.ndarray: 제어 입력
         """
 
-        velo = self.velocity_control(state, t, self.ee_target_pos)
+        velo = self.velocity_control(state, t)
 
         return velo
 
@@ -120,7 +120,7 @@ class MyController(Controller):
         self.pre_pos = pos.copy()
         return pos
 
-    def velocity_control(self, state: State, t, target_pose: np.ndarray) -> np.ndarray:
+    def velocity_control(self, state: State, t) -> np.ndarray:
         cjn = self.robot_info.ctrl_joint_number
 
         J = self.J_linear(state.positions[:cjn])
