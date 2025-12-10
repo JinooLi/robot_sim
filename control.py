@@ -32,6 +32,12 @@ class MyCLBFGenerator(CLBFGenerator):
         sig = self._sigmoid(s)
         return sig * (1 - sig)
 
+    def _test(self, s):
+        return np.clip(max(0.0, np.exp(s - 1) * (s - 1) + np.exp(-1)), 0, 1)
+
+    def _dtest(self, s):
+        return np.exp(s - 1) * s if s >= 0 else 0.0
+
     def _Circ(self, x: np.ndarray):
         return -(
             (x - self.unsafe_region_center) @ (x - self.unsafe_region_center)
@@ -125,7 +131,7 @@ class MyController(Controller):
         cjn = self.robot_info.ctrl_joint_number
 
         # end-effector 제어
-        k_ee = 1
+        k_ee = 10
 
         J = self.J_linear(state.positions[:cjn], 11)  # end-effector의 Jacobian
 
@@ -134,7 +140,7 @@ class MyController(Controller):
         end_effector_control = J_pinv @ (-self.dW_dx_func(state.ee_position)) * k_ee
 
         # 안전 제어
-        k_safe = 0.7
+        k_safe = 7
 
         saved_barrier_val = 0
         saved_pos = np.zeros(3)
