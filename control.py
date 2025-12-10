@@ -124,31 +124,46 @@ class MyController(Controller):
     def velocity_control(self, state: State, t) -> np.ndarray:
         cjn = self.robot_info.ctrl_joint_number
 
-        J = self.J_linear(state.positions[:cjn], 11)  # end-effector의 Jacobian
-
+        # end-effector 제어
         k_ee = 1
+
+        J = self.J_linear(state.positions[:cjn], 11)  # end-effector의 Jacobian
 
         # J_pinv = J.T @ np.linalg.inv(J @ J.T)
         J_pinv = np.linalg.pinv(J)
         end_effector_control = J_pinv @ (-self.dW_dx_func(state.ee_position)) * k_ee
 
-        N = np.eye(cjn) - J_pinv @ J
+        # 안전 제어
+        k_safe = 0.7
 
-        k_N = 0.73
+        saved_barrier_val = 0
+        saved_pos = np.zeros(3)
+        important_index = 0
 
-        p_null = np.zeros(cjn)
         for i in range(cjn):
-            J_link = self.J_linear(state.positions[:cjn], i)
             pos = self.get_pos_of_joint(i)
-            J_pinv_link = J_link.T @ np.linalg.inv(
-                J_link @ J_link.T + 1e-6 * np.eye(3)
-            )  # np.linalg.pinv(J_link) <- 이거 쓰면 기존 행렬이 거의 singular일 때 터진다.
-            p_null += J_pinv_link @ self.dW_dx_func(pos)
+            barrier_val = self.clbf_generator._barrier_function(
+                pos, theta=self.clbf_generator.barrier_gain
+            )
+            if saved_barrier_val < barrier_val:
+                saved_barrier_val = barrier_val
+                important_index = i
+                saved_pos = pos
 
-        null_space_control = -N @ p_null * k_N  # (k_N * state.velocities[:cjn])
+        J_link = self.J_linear(state.positions[:cjn], important_index)
+        J_pinv_link = J_link.T @ np.linalg.inv(
+            J_link @ J_link.T + 1e-6 * np.eye(3)
+        )  # np.linalg.pinv(J_link) <- 이거 쓰면 기존 행렬이 거의 singular일 때 터진다.
 
-        dq = end_effector_control + null_space_control
+        safety_control = -J_pinv_link @ self.clbf_generator._dB_dx(saved_pos) * k_safe
 
+        # 안전 제어와 end-effector 제어를 합성
+        dq = (
+            end_effector_control * (1 - saved_barrier_val)
+            + safety_control * saved_barrier_val
+        )
+
+        # 속도 제한
         dq = np.clip(
             dq,
             -0.2 * self.robot_info.velocity_limits[:cjn],
