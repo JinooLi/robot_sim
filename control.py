@@ -8,11 +8,13 @@ class MyCLBFGenerator(CLBFGenerator):
         self,
         unsafe_region_center: np.ndarray,
         unsafe_region_radius: float,
+        unsafe_region_margin: float,
         barrier_gain: float,
         Lyapunov_center: np.ndarray,
     ):
         self.unsafe_region_center = unsafe_region_center
         self.unsafe_region_radius = unsafe_region_radius
+        self.unsafe_region_margin = unsafe_region_margin
         self.barrier_gain = barrier_gain
         self.Lyapunov_center = Lyapunov_center
 
@@ -30,20 +32,20 @@ class MyCLBFGenerator(CLBFGenerator):
         sig = self._sigmoid(s)
         return sig * (1 - sig)
 
-    def _Circ(self, x: np.ndarray, theta: float = 10.0):
-        return -theta * (
+    def _Circ(self, x: np.ndarray):
+        return -(
             (x - self.unsafe_region_center) @ (x - self.unsafe_region_center)
-            - self.unsafe_region_radius**2
+            - (self.unsafe_region_radius + self.unsafe_region_margin) ** 2
         )
 
-    def _dCirc_dx(self, x: np.ndarray, theta: float = 10.0):
-        return -2 * theta * (x - self.unsafe_region_center)
+    def _dCirc_dx(self, x: np.ndarray):
+        return -2 * (x - self.unsafe_region_center - self.unsafe_region_margin)
 
     def _barrier_function(self, x: np.ndarray, theta: float = 10.0):
-        return self._sigmoid(self._Circ(x, theta))
+        return self._sigmoid(theta * self._Circ(x))
 
     def _dB_dx(self, x: np.ndarray, theta: float = 10.0):
-        return self._dsigmoid(self._Circ(x, theta)) * self._dCirc_dx(x, theta)
+        return self._dsigmoid(theta * self._Circ(x)) * self._dCirc_dx(x) * theta
 
     def _V(self, x: np.ndarray):
         return 0.5 * (x - self.Lyapunov_center) @ (x - self.Lyapunov_center)
@@ -62,7 +64,6 @@ class MyController(Controller):
     def __init__(
         self,
         clbf_generator: MyCLBFGenerator,
-        target_ee_pos: np.ndarray = np.array([-0.3, -0.3, 0.8]),
     ):
         super().__init__()
         self.clbf_generator = clbf_generator
@@ -163,13 +164,12 @@ if __name__ == "__main__":
     clbf_Gen = MyCLBFGenerator(
         unsafe_region_center=np.array([0.0, 0.0, 0.6]),
         unsafe_region_radius=0.3,
+        unsafe_region_margin=0.05,
         barrier_gain=100.0,
         Lyapunov_center=np.array([0.5, 0.5, 0.5]),
     )
 
-    controller = MyController(
-        clbf_generator=clbf_Gen, target_ee_pos=np.array([-0.6, -0.6, 0.1])
-    )
+    controller = MyController(clbf_generator=clbf_Gen)
 
     sim = RobotSim(
         controller=controller,

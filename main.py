@@ -19,14 +19,13 @@ if __name__ == "__main__":
 
     clbf_gen = MyCLBFGenerator(
         unsafe_region_center=np.array([0.3, 0.3, 0.8]),
-        unsafe_region_radius=0.15,
+        unsafe_region_radius=0.2,
+        unsafe_region_margin=0.05,
         barrier_gain=200,
         Lyapunov_center=np.array([0.5, 0.5, 0.5]),
     )
 
-    controller = MyController(
-        clbf_generator=clbf_gen, target_ee_pos=np.array([-0.6, -0.6, 0.1])
-    )
+    controller = MyController(clbf_generator=clbf_gen)
     sim = RobotSim(
         controller=controller,
         gravity=-9.81,
